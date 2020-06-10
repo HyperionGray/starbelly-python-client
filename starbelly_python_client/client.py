@@ -4,7 +4,6 @@ Python Starbelly Client.
 import argparse
 from base64 import b64encode
 from contextlib import asynccontextmanager
-import fire
 from google.protobuf.json_format import MessageToJson
 import itertools
 import inspect
@@ -23,7 +22,7 @@ async def connect_starbelly(
     url: str, username: str, password: str, json_format: bool = False
 ):
     """
-    Return Starbelly client connected over websocket. 
+    Return Starbelly client connected over websocket.
     """
     credential = "{}:{}".format(username, password)
     basic_auth_hash = b64encode(credential.encode("ascii")).decode("ascii")
