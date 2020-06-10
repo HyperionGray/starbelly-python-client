@@ -69,17 +69,77 @@ class StarbellyConnection:
         )
         return await self.send_request(request)
 
-    async def list_captcha_solvers(self, page=None):
+    async def list_captcha_solvers(
+        self, page: int = None
+    ) -> starbelly_pb2.ResponseListCaptchaSolvers:
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             list_captcha_solvers=starbelly_pb2.RequestListCaptchaSolvers(page=page),
         )
         return await self.send_request(request)
 
-    async def list_policies(self, page):
+    async def list_policies(
+        self, page: int = None
+    ) -> starbelly_pb2.ResponseListPolicies:
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             list_policies=starbelly_pb2.RequestListPolicies(page=page),
+        )
+        return await self.send_request(request)
+
+    async def list_jobs(
+        self,
+        page: int = None,
+        started_after: str = None,
+        tag: str = None,
+        schedule_id: bytes = None,
+    ) -> starbelly_pb2.ResponseListJobs:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            list_jobs=starbelly_pb2.RequestListJobs(
+                page=page,
+                started_after=started_after,
+                tag=tag,
+                schedule_id=schedule_id,
+            ),
+        )
+        return await self.send_request(request)
+
+    async def list_schedules(
+        self, page: int = None
+    ) -> starbelly_pb2.ResponseListSchedules:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            list_schedules=starbelly_pb2.RequestListSchedules(page=page),
+        )
+        return await self.send_request(request)
+
+    async def list_domain_logins(
+        self, page: int = None
+    ) -> starbelly_pb2.ResponseListDomainLogins:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            list_domain_logins=starbelly_pb2.RequestListDomainLogins(page=page),
+        )
+        return await self.send_request(request)
+
+    async def list_rate_limits(
+        self, page: int = None
+    ) -> starbelly_pb2.ResponseListRateLimits:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            list_rate_limits=starbelly_pb2.RequestListRateLimits(page=page),
+        )
+        return await self.send_request(request)
+
+    async def performance_profile(
+        self, duration: float = None, sort_by: str = None, top_n: int = None
+    ) -> starbelly_pb2.ResponsePerformanceProfile:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            performance_profile=starbelly_pb2.RequestPerformanceProfile(
+                duration=duration, sort_by=sort_by, top_n=top_n
+            ),
         )
         return await self.send_request(request)
 
@@ -175,12 +235,45 @@ def _build_cmd_parser():
 
 def _build_cmd_subparsers(parser: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(dest="command", required=True)
+    # List policies
     list_policies_parser = subparsers.add_parser("list-policies")
     list_policies_parser.set_defaults(func="list_policies")
     list_policies_parser.add_argument("--page", "-p", help="results page number")
+    # List captcha solvers
     list_captcha_solvers_parser = subparsers.add_parser("list-captcha-solvers")
     list_captcha_solvers_parser.set_defaults(func="list_captcha_solvers")
     list_captcha_solvers_parser.add_argument("--page", "-p", help="results page number")
+    # List jobs
+    list_jobs_parser = subparsers.add_parser("list-jobs")
+    list_jobs_parser.add_argument("--page", "-p", type=int, help="results page number")
+    list_jobs_parser.add_argument("--started-after", type=str)
+    list_jobs_parser.add_argument("--tag", type=str)
+    list_jobs_parser.add_argument("--schedule-id", type=bytes)
+    list_jobs_parser.set_defaults(func="list_jobs")
+    # List schedules
+    list_schedules_parser = subparsers.add_parser("list-schedules")
+    list_schedules_parser.add_argument(
+        "--page", "-p", type=int, help="results page number"
+    )
+    list_schedules_parser.set_defaults(func="list_schedules")
+    # List domain logins
+    list_domain_logins_parser = subparsers.add_parser("list-domain-logins")
+    list_domain_logins_parser.add_argument(
+        "--page", "-p", type=int, help="results page number"
+    )
+    list_domain_logins_parser.set_defaults(func="list_domain_logins")
+    # List rate limits
+    list_rate_limits_parser = subparsers.add_parser("list-rate-limits")
+    list_rate_limits_parser.add_argument(
+        "--page", "-p", type=int, help="results page number"
+    )
+    list_rate_limits_parser.set_defaults(func="list_rate_limits")
+    # Performance profile
+    performance_profile_parser = subparsers.add_parser("performance-profile")
+    performance_profile_parser.add_argument("--duration", type=float)
+    performance_profile_parser.add_argument("--sort-by", type=str)
+    performance_profile_parser.add_argument("--top-n", type=int)
+    performance_profile_parser.set_defaults(func="performance_profile")
 
 
 def _parse_cmd_args():
