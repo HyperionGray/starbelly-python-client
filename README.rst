@@ -16,11 +16,13 @@ development dependency.
 Run pylint with pylint-protobuf plugin:
 
 .. code-block:: bash
+
     $ pylint --load-plugins=pylint_protobuf client.py
 
 To use the plugin with VSCode, edit `settings.json <https://code.visualstudio.com/docs/getstarted/settings#_settings-file-locations>`_:
 
 .. code-block:: json
+
     {
         "python.pythonPath": "venv/bin/python",
         "python.testing.unittestArgs": [
