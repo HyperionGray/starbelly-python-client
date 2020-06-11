@@ -2,7 +2,7 @@
 Python Starbelly Client.
 """
 import argparse
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from contextlib import asynccontextmanager
 from google.protobuf.json_format import MessageToJson
 import itertools
@@ -51,12 +51,19 @@ class StarbellyConnection:
         self.request_id = itertools.count()
         self.json_format = json_format
 
-    async def delete_captcha_solver(self, solver_id=None):
+    async def delete_captcha_solver(self, solver_id: bytes):
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             delete_captcha_solver=starbelly_pb2.RequestDeleteCaptchaSolver(
                 solver_id=solver_id
             ),
+        )
+        return await self.send_request(request)
+
+    async def delete_job(self, job_id: bytes):
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            delete_job=starbelly_pb2.RequestDeleteJob(job_id=job_id),
         )
         return await self.send_request(request)
 
@@ -69,9 +76,40 @@ class StarbellyConnection:
         )
         return await self.send_request(request)
 
+    async def get_job(self, job_id: bytes) -> starbelly_pb2.Job:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            get_job=starbelly_pb2.RequestGetJob(job_id=job_id),
+        )
+        return await self.send_request(request)
+
+    async def get_job_items(
+        self,
+        job_id: bytes,
+        include_success: bool = True,
+        include_error: bool = True,
+        include_exception: bool = True,
+        compression_ok: bool = True,
+        offset: int = None,
+        limit: int = None,
+    ) -> starbelly_pb2.ResponseListItems:
+        page = starbelly_pb2.Page(limit=limit, offset=offset)
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            get_job_items=starbelly_pb2.RequestGetJobItems(
+                job_id=job_id,
+                include_success=include_success,
+                include_error=include_error,
+                include_exception=include_exception,
+                page=page,
+            ),
+        )
+        return await self.send_request(request)
+
     async def list_captcha_solvers(
         self, page: int = None
     ) -> starbelly_pb2.ResponseListCaptchaSolvers:
+        page = starbelly_pb2.Page(limit=limit, offset=offset)
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             list_captcha_solvers=starbelly_pb2.RequestListCaptchaSolvers(page=page),
@@ -79,8 +117,9 @@ class StarbellyConnection:
         return await self.send_request(request)
 
     async def list_policies(
-        self, page: int = None
+        self, offset: int = None, limit: int = None
     ) -> starbelly_pb2.ResponseListPolicies:
+        page = starbelly_pb2.Page(limit=limit, offset=offset)
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             list_policies=starbelly_pb2.RequestListPolicies(page=page),
@@ -89,11 +128,13 @@ class StarbellyConnection:
 
     async def list_jobs(
         self,
-        page: int = None,
+        offset: int = None,
+        limit: int = None,
         started_after: str = None,
         tag: str = None,
         schedule_id: bytes = None,
     ) -> starbelly_pb2.ResponseListJobs:
+        page = starbelly_pb2.Page(limit=limit, offset=offset)
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             list_jobs=starbelly_pb2.RequestListJobs(
@@ -106,8 +147,9 @@ class StarbellyConnection:
         return await self.send_request(request)
 
     async def list_schedules(
-        self, page: int = None
+        self, offset: int = None, limit: int = None
     ) -> starbelly_pb2.ResponseListSchedules:
+        page = starbelly_pb2.Page(limit=limit, offset=offset)
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             list_schedules=starbelly_pb2.RequestListSchedules(page=page),
@@ -115,8 +157,9 @@ class StarbellyConnection:
         return await self.send_request(request)
 
     async def list_domain_logins(
-        self, page: int = None
+        self, offset: int = None, limit: int = None
     ) -> starbelly_pb2.ResponseListDomainLogins:
+        page = starbelly_pb2.Page(limit=limit, offset=offset)
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             list_domain_logins=starbelly_pb2.RequestListDomainLogins(page=page),
@@ -124,8 +167,9 @@ class StarbellyConnection:
         return await self.send_request(request)
 
     async def list_rate_limits(
-        self, page: int = None
+        self, offset: int = None, limit: int = None
     ) -> starbelly_pb2.ResponseListRateLimits:
+        page = starbelly_pb2.Page(limit=limit, offset=offset)
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             list_rate_limits=starbelly_pb2.RequestListRateLimits(page=page),
@@ -235,17 +279,75 @@ def _build_cmd_parser():
 
 def _build_cmd_subparsers(parser: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(dest="command", required=True)
+    # Delete job
+    delete_job_parser = subparsers.add_parser("delete-job")
+    delete_job_parser.set_defaults(func="delete_job")
+    delete_job_parser.add_argument(
+        "job_id", metavar="job-id", help="job ID (base64 encoded)", type=b64decode
+    )
+    delete_job_parser.set_defaults(func="delete_job")
+    # Get job
+    get_job_parser = subparsers.add_parser("get-job")
+    get_job_parser.set_defaults(func="get_job")
+    get_job_parser.add_argument(
+        "job_id", metavar="job-id", help="job ID (base64 encoded)", type=b64decode
+    )
+    get_job_parser.set_defaults(func="get_job")
+    # Get job items
+    get_job_items_parser = subparsers.add_parser("get-job-items")
+    get_job_items_parser.set_defaults(func="get_job_items")
+    get_job_items_parser.add_argument(
+        "job_id", metavar="job-id", help="job ID (base64 encoded)", type=b64decode
+    )
+    get_job_items_parser.add_argument(
+        "--include-success",
+        help="include successful crawl items",
+        type=int,
+        choices=[0, 1],
+        default=1,
+    )
+    get_job_items_parser.add_argument(
+        "--include-error",
+        help="include error crawl items",
+        type=int,
+        choices=[0, 1],
+        default=1,
+    )
+    get_job_items_parser.add_argument(
+        "--include-exception",
+        help="include crawl items that raised exceptions",
+        type=int,
+        choices=[0, 1],
+        default=1,
+    )
+    get_job_items_parser.add_argument(
+        "--compression_ok",
+        help="include crawl items that raised exceptions",
+        type=int,
+        choices=[0, 1],
+        default=1,
+    )
+    get_job_items_parser.add_argument("--offset", help="results offset", type=int)
+    get_job_items_parser.add_argument("--limit", help="results to return", type=int)
+    get_job_items_parser.set_defaults(func="get_job_items")
     # List policies
     list_policies_parser = subparsers.add_parser("list-policies")
     list_policies_parser.set_defaults(func="list_policies")
-    list_policies_parser.add_argument("--page", "-p", help="results page number")
+    list_policies_parser.add_argument("--offset", help="results offset", type=int)
+    list_policies_parser.add_argument("--limit", help="results to return", type=int)
     # List captcha solvers
     list_captcha_solvers_parser = subparsers.add_parser("list-captcha-solvers")
     list_captcha_solvers_parser.set_defaults(func="list_captcha_solvers")
-    list_captcha_solvers_parser.add_argument("--page", "-p", help="results page number")
+    list_captcha_solvers_parser.add_argument(
+        "--offset", help="results offset", type=int
+    )
+    list_captcha_solvers_parser.add_argument(
+        "--limit", help="results to return", type=int
+    )
     # List jobs
     list_jobs_parser = subparsers.add_parser("list-jobs")
-    list_jobs_parser.add_argument("--page", "-p", type=int, help="results page number")
+    list_jobs_parser.add_argument("--offset", help="results offset", type=int)
+    list_jobs_parser.add_argument("--limit", help="results to return", type=int)
     list_jobs_parser.add_argument("--started-after", type=str)
     list_jobs_parser.add_argument("--tag", type=str)
     list_jobs_parser.add_argument("--schedule-id", type=bytes)
@@ -255,18 +357,20 @@ def _build_cmd_subparsers(parser: argparse.ArgumentParser):
     list_schedules_parser.add_argument(
         "--page", "-p", type=int, help="results page number"
     )
+    list_schedules_parser.add_argument("--offset", help="results offset", type=int)
+    list_schedules_parser.add_argument("--limit", help="results to return", type=int)
     list_schedules_parser.set_defaults(func="list_schedules")
     # List domain logins
     list_domain_logins_parser = subparsers.add_parser("list-domain-logins")
+    list_domain_logins_parser.add_argument("--offset", help="results offset", type=int)
     list_domain_logins_parser.add_argument(
-        "--page", "-p", type=int, help="results page number"
+        "--limit", help="results to return", type=int
     )
     list_domain_logins_parser.set_defaults(func="list_domain_logins")
     # List rate limits
     list_rate_limits_parser = subparsers.add_parser("list-rate-limits")
-    list_rate_limits_parser.add_argument(
-        "--page", "-p", type=int, help="results page number"
-    )
+    list_rate_limits_parser.add_argument("--offset", help="results offset", type=int)
+    list_rate_limits_parser.add_argument("--limit", help="results to return", type=int)
     list_rate_limits_parser.set_defaults(func="list_rate_limits")
     # Performance profile
     performance_profile_parser = subparsers.add_parser("performance-profile")
