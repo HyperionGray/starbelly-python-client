@@ -17,6 +17,15 @@ from starbelly_proto import starbelly_pb2
 logger = logging.getLogger(__name__)
 
 
+_JOB_RUN_STATES = {
+    "CANCELLED": starbelly_pb2.JobRunState.CANCELLED,
+    "COMPLETED": starbelly_pb2.JobRunState.COMPLETED,
+    "PAUSED": starbelly_pb2.JobRunState.PAUSED,
+    "PENDING": starbelly_pb2.JobRunState.PENDING,
+    "RUNNING": starbelly_pb2.JobRunState.RUNNING,
+}
+
+
 @asynccontextmanager
 async def connect_starbelly(
     url: str, username: str, password: str, json_format: bool = False
@@ -60,10 +69,35 @@ class StarbellyConnection:
         )
         return await self.send_request(request)
 
+    async def delete_domain_login(self, domain_login_id: bytes):
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            delete_domain_login=starbelly_pb2.RequestDeleteDomainLogin(
+                domain_login_id=domain_login_id
+            ),
+        )
+        return await self.send_request(request)
+
     async def delete_job(self, job_id: bytes):
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             delete_job=starbelly_pb2.RequestDeleteJob(job_id=job_id),
+        )
+        return await self.send_request(request)
+
+    async def delete_policy(self, policy_id: bytes):
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            delete_policy=starbelly_pb2.RequestDeletePolicy(policy_id=policy_id),
+        )
+        return await self.send_request(request)
+
+    async def delete_schedule(self, schedule_id: bytes):
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            delete_schedule=starbelly_pb2.RequestDeleteSchedule(
+                schedule_id=schedule_id
+            ),
         )
         return await self.send_request(request)
 
@@ -72,6 +106,17 @@ class StarbellyConnection:
             request_id=next(self.request_id),
             get_captcha_solver=starbelly_pb2.RequestGetCaptchaSolver(
                 solver_id=solver_id
+            ),
+        )
+        return await self.send_request(request)
+
+    async def get_domain_login(
+        self, domain_login_id: bytes
+    ) -> starbelly_pb2.DomainLogin:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            get_domain_login=starbelly_pb2.RequestGetDomainLogin(
+                domain_login_id=domain_login_id
             ),
         )
         return await self.send_request(request)
@@ -103,6 +148,20 @@ class StarbellyConnection:
                 include_exception=include_exception,
                 page=page,
             ),
+        )
+        return await self.send_request(request)
+
+    async def get_schedule(self, schedule_id: bytes) -> starbelly_pb2.Schedule:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            get_schedule=starbelly_pb2.RequestGetSchedule(schedule_id=schedule_id),
+        )
+        return await self.send_request(request)
+
+    async def get_policy(self, policy_id: bytes) -> starbelly_pb2.Policy:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            get_policy=starbelly_pb2.RequestGetPolicy(policy_id=policy_id),
         )
         return await self.send_request(request)
 
@@ -187,6 +246,26 @@ class StarbellyConnection:
         )
         return await self.send_request(request)
 
+    async def set_job(
+        self,
+        run_state: starbelly_pb2.JobRunState,
+        policy_id: bytes,
+        seeds: list,
+        name: str,
+        tags: list = [],
+    ) -> starbelly_pb2.ResponseNewJob:
+        request = starbelly_pb2.Request(
+            request_id=next(self.request_id),
+            set_job=starbelly_pb2.RequestSetJob(
+                run_state=run_state,
+                policy_id=policy_id,
+                seeds=seeds,
+                name=name,
+                tags=tags,
+            ),
+        )
+        return await self.send_request(request)
+
     async def send_request(self, request):
         when_completed = trio.Event()
         self.requests[request.request_id] = when_completed
@@ -250,7 +329,10 @@ def _cmd_environ_or_required(key):
 
 
 def _build_cmd_parser():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Starbelly Command Line Client",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "-v", "--verbose", help="increase output verbosity", action="store_true"
     )
@@ -278,26 +360,77 @@ def _build_cmd_parser():
 
 
 def _build_cmd_subparsers(parser: argparse.ArgumentParser):
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True,
+        title="available commands",
+        metavar="command [options]",
+    )
+    # Delete captcha solver
+    delete_captcha_solver_parser = subparsers.add_parser(
+        "delete-captcha-solver", help="delete captcha solver"
+    )
+    delete_captcha_solver_parser.set_defaults(func="delete_captcha_solver")
+    delete_captcha_solver_parser.add_argument(
+        "captcha_solver_id",
+        metavar="captcha_solver_id",
+        help="captcha solver ID [base64 encoded]",
+        type=b64decode,
+    )
+    delete_captcha_solver_parser.set_defaults(func="delete_captcha_solver")
+    # Delete domain login
+    delete_domain_login_parser = subparsers.add_parser(
+        "delete-domain-login", help="delete login for domain"
+    )
+    delete_domain_login_parser.set_defaults(func="delete_domain_login")
+    delete_domain_login_parser.add_argument(
+        "domain_login_id",
+        metavar="domain_login_id",
+        help="domain login ID [base64 encoded]",
+        type=b64decode,
+    )
+    delete_domain_login_parser.set_defaults(func="delete_domain_login")
     # Delete job
-    delete_job_parser = subparsers.add_parser("delete-job")
+    delete_job_parser = subparsers.add_parser("delete-job", help="delete job")
     delete_job_parser.set_defaults(func="delete_job")
     delete_job_parser.add_argument(
-        "job_id", metavar="job-id", help="job ID (base64 encoded)", type=b64decode
+        "job_id", metavar="job-id", help="job ID [base64 encoded]", type=b64decode
     )
     delete_job_parser.set_defaults(func="delete_job")
+    # Delete policy
+    delete_policy_parser = subparsers.add_parser("delete-policy", help="delete policy")
+    delete_policy_parser.set_defaults(func="delete_policy")
+    delete_policy_parser.add_argument(
+        "policy_id",
+        metavar="policy-id",
+        help="policy ID [base64 encoded]",
+        type=b64decode,
+    )
+    delete_policy_parser.set_defaults(func="delete_policy")
+    # Get captcha solver
+    get_captcha_solver_parser = subparsers.add_parser(
+        "get-captcha-solver", help="get captcha solver"
+    )
+    get_captcha_solver_parser.set_defaults(func="get_captcha_solver")
+    get_captcha_solver_parser.add_argument(
+        "captcha_solver_id",
+        metavar="captcha-solver-id",
+        help="captcha solver ID [base64 encoded]",
+        type=b64decode,
+    )
+    get_captcha_solver_parser.set_defaults(func="get_captcha_solver")
     # Get job
-    get_job_parser = subparsers.add_parser("get-job")
+    get_job_parser = subparsers.add_parser("get-job", help="get job")
     get_job_parser.set_defaults(func="get_job")
     get_job_parser.add_argument(
-        "job_id", metavar="job-id", help="job ID (base64 encoded)", type=b64decode
+        "job_id", metavar="job-id", help="job ID [base64 encoded]", type=b64decode
     )
     get_job_parser.set_defaults(func="get_job")
     # Get job items
-    get_job_items_parser = subparsers.add_parser("get-job-items")
+    get_job_items_parser = subparsers.add_parser("get-job-items", help="get job items")
     get_job_items_parser.set_defaults(func="get_job_items")
     get_job_items_parser.add_argument(
-        "job_id", metavar="job-id", help="job ID (base64 encoded)", type=b64decode
+        "job_id", metavar="job-id", help="job ID [base64 encoded]", type=b64decode
     )
     get_job_items_parser.add_argument(
         "--include-success",
@@ -330,13 +463,25 @@ def _build_cmd_subparsers(parser: argparse.ArgumentParser):
     get_job_items_parser.add_argument("--offset", help="results offset", type=int)
     get_job_items_parser.add_argument("--limit", help="results to return", type=int)
     get_job_items_parser.set_defaults(func="get_job_items")
+    # Get policy
+    get_policy_parser = subparsers.add_parser("get-policy", help="get policy")
+    get_policy_parser.set_defaults(func="get_policy")
+    get_policy_parser.add_argument(
+        "policy_id",
+        metavar="policy-id",
+        help="policy ID [base64 encoded]",
+        type=b64decode,
+    )
+    get_policy_parser.set_defaults(func="get_policy")
     # List policies
-    list_policies_parser = subparsers.add_parser("list-policies")
+    list_policies_parser = subparsers.add_parser("list-policies", help="list policies")
     list_policies_parser.set_defaults(func="list_policies")
     list_policies_parser.add_argument("--offset", help="results offset", type=int)
     list_policies_parser.add_argument("--limit", help="results to return", type=int)
     # List captcha solvers
-    list_captcha_solvers_parser = subparsers.add_parser("list-captcha-solvers")
+    list_captcha_solvers_parser = subparsers.add_parser(
+        "list-captcha-solvers", help="list captcha solvers"
+    )
     list_captcha_solvers_parser.set_defaults(func="list_captcha_solvers")
     list_captcha_solvers_parser.add_argument(
         "--offset", help="results offset", type=int
@@ -345,7 +490,7 @@ def _build_cmd_subparsers(parser: argparse.ArgumentParser):
         "--limit", help="results to return", type=int
     )
     # List jobs
-    list_jobs_parser = subparsers.add_parser("list-jobs")
+    list_jobs_parser = subparsers.add_parser("list-jobs", help="list jobs")
     list_jobs_parser.add_argument("--offset", help="results offset", type=int)
     list_jobs_parser.add_argument("--limit", help="results to return", type=int)
     list_jobs_parser.add_argument("--started-after", type=str)
@@ -353,7 +498,9 @@ def _build_cmd_subparsers(parser: argparse.ArgumentParser):
     list_jobs_parser.add_argument("--schedule-id", type=bytes)
     list_jobs_parser.set_defaults(func="list_jobs")
     # List schedules
-    list_schedules_parser = subparsers.add_parser("list-schedules")
+    list_schedules_parser = subparsers.add_parser(
+        "list-schedules", help="list schedules"
+    )
     list_schedules_parser.add_argument(
         "--page", "-p", type=int, help="results page number"
     )
@@ -361,23 +508,55 @@ def _build_cmd_subparsers(parser: argparse.ArgumentParser):
     list_schedules_parser.add_argument("--limit", help="results to return", type=int)
     list_schedules_parser.set_defaults(func="list_schedules")
     # List domain logins
-    list_domain_logins_parser = subparsers.add_parser("list-domain-logins")
+    list_domain_logins_parser = subparsers.add_parser(
+        "list-domain-logins", help="list domain logins"
+    )
     list_domain_logins_parser.add_argument("--offset", help="results offset", type=int)
     list_domain_logins_parser.add_argument(
         "--limit", help="results to return", type=int
     )
     list_domain_logins_parser.set_defaults(func="list_domain_logins")
     # List rate limits
-    list_rate_limits_parser = subparsers.add_parser("list-rate-limits")
+    list_rate_limits_parser = subparsers.add_parser(
+        "list-rate-limits", help="list rate limits"
+    )
     list_rate_limits_parser.add_argument("--offset", help="results offset", type=int)
     list_rate_limits_parser.add_argument("--limit", help="results to return", type=int)
     list_rate_limits_parser.set_defaults(func="list_rate_limits")
     # Performance profile
-    performance_profile_parser = subparsers.add_parser("performance-profile")
+    performance_profile_parser = subparsers.add_parser(
+        "performance-profile", help="get usage stats"
+    )
     performance_profile_parser.add_argument("--duration", type=float)
     performance_profile_parser.add_argument("--sort-by", type=str)
     performance_profile_parser.add_argument("--top-n", type=int)
     performance_profile_parser.set_defaults(func="performance_profile")
+    # Set job
+    set_job_parser = subparsers.add_parser("set-job", help="set job")
+    set_job_parser.set_defaults(func="set_job")
+    set_job_parser.add_argument(
+        "run_state",
+        metavar="run-state",
+        help=f"run state [{','.join(_JOB_RUN_STATES.keys())}]",
+        type=lambda run_state: _JOB_RUN_STATES[run_state],
+        choices=starbelly_pb2.JobRunState.keys(),
+    )
+    set_job_parser.add_argument(
+        "policy_id",
+        metavar="policy-id",
+        help="policy ID [base64 encoded]",
+        type=b64decode,
+    )
+    set_job_parser.add_argument(
+        "name", help="job name", type=str,
+    )
+    set_job_parser.add_argument(
+        "--tags",
+        help="job tags ('tag1,tag2,tag3')",
+        type=lambda s: [i.strip() for i in s.split(",") if i.strip()],
+    )
+    set_job_parser.add_argument("seeds", help="job seed url(s)", nargs="+")
+    set_job_parser.set_defaults(func="set_job")
 
 
 def _parse_cmd_args():
