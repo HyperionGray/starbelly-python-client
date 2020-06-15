@@ -23,25 +23,22 @@ To use the plugin with VSCode, edit `settings.json <https://code.visualstudio.co
 
 .. code-block:: json
 
-    {
-        "python.pythonPath": "venv/bin/python",
-        "python.testing.unittestArgs": [
-            "-v",
-    {
-        "python.pythonPath": "venv/bin/python",
-        "python.linkting.pylintEnabled": true,
-        "python.linting.pylintArgs": ["--load-plugins", "pylint_protobuf"],
-        "python.testing.unittestArgs": [
-            "-v",
-            "-s",
-            "./tests",
-            "-p",
-            "test_*.py"
-        ],
-        "python.testing.pytestEnabled": true,
-        "python.testing.nosetestsEnabled": false,
-        "python.testing.unittestEnabled": false,
-        "python.testing.pytestArgs": [
-            "tests"
-        ]
-    }
+   {
+       "python.pythonPath": "venv/bin/python",
+       "python.linkting.pylintEnabled": true,
+       "python.linting.pylintArgs": ["--load-plugins", "pylint_protobuf", "--disable", "C0330" ],
+       "python.testing.unittestArgs": [
+           "-v",
+           "-s",
+           "./tests",
+           "-p",
+           "test_*.py"
+       ],
+       "python.testing.pytestEnabled": true,
+       "python.testing.nosetestsEnabled": false,
+       "python.testing.unittestEnabled": false,
+       "python.testing.pytestArgs": [
+           "tests"
+       ],
+       "restructuredtext.confPath": "${workspaceFolder}/venv/lib/python3.7/site-packages/importlib_metadata/docs"
+   }
