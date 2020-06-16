@@ -3,9 +3,11 @@ Starbelly Command Line Client
 """
 import argparse
 from base64 import b64decode
+from google.protobuf.json_format import MessageToJson
 import inspect
 import logging
 import os
+import trio
 from trio_websocket import ConnectionClosed, ConnectionRejected
 from starbelly_proto import starbelly_pb2
 
@@ -24,7 +26,6 @@ _JOB_RUN_STATES = {
 
 async def cli(args):
     """Run the command line client
-    TODO: sigint handling
     """
     if args.verbose:
         log_level = logging.DEBUG
@@ -33,14 +34,17 @@ async def cli(args):
 
     logging.basicConfig(level=log_level)
     try:
-        async with connect_starbelly(
-            args.url, args.username, args.password, json_format=True
-        ) as conn:
+        async with connect_starbelly(args.url, args.username, args.password) as conn:
             func = getattr(conn, args.func)
             sig = inspect.signature(func)
             func_args = {k: getattr(args, k) for k in sig.parameters}
-            await func(**func_args)
-            await conn.done()
+            if inspect.isasyncgenfunction(func):
+                async for event in func(**func_args):
+                    print(MessageToJson(event))
+            else:
+                response = await func(**func_args)
+                print(MessageToJson(response))
+                await conn.done()
     except ConnectionClosed as cc:
         logger.debug("Connection closed")
     except ConnectionRejected as cc:
@@ -186,11 +190,7 @@ def _build_get_job_items_parser(subparsers: argparse.ArgumentParser):
         default=1,
     )
     get_job_items_parser.add_argument(
-        "--compression_ok",
-        help="include crawl items that raised exceptions",
-        type=int,
-        choices=[0, 1],
-        default=1,
+        "--compression_ok", help="compress data", type=bool, choices=[0, 1], default=1,
     )
     get_job_items_parser.add_argument("--offset", help="results offset", type=int)
     get_job_items_parser.add_argument("--limit", help="results to return", type=int)
@@ -313,7 +313,7 @@ def _build_subscribe_job_status_parser(subparsers: argparse.ArgumentParser):
     subscribe_job_status_parser = subparsers.add_parser(
         "subscribe-job-status", help="subscribe to job status"
     )
-    subscribe_job_status_parser.add_argument("--min-internval", type=int)
+    subscribe_job_status_parser.add_argument("--min-interval", type=int)
     subscribe_job_status_parser.set_defaults(func="subscribe_job_status")
 
 
@@ -323,6 +323,12 @@ def _build_subscribe_job_sync_parser(subparsers: argparse.ArgumentParser):
     )
     subscribe_job_sync_parser.add_argument(
         "job_id", metavar="job-id", type=b64decode, help="job ID [base64 encoded]"
+    )
+    subscribe_job_sync_parser.add_argument(
+        "--sync-token", type=str, help="the job job sync token"
+    )
+    subscribe_job_sync_parser.add_argument(
+        "--compression_ok", help="compress data", type=bool, choices=[0, 1], default=1,
     )
     subscribe_job_sync_parser.set_defaults(func="subscribe_job_sync")
 
