@@ -4,7 +4,6 @@ Python Starbelly Client.
 import argparse
 from base64 import b64encode
 from contextlib import asynccontextmanager
-from google.protobuf.json_format import MessageToJson
 import itertools
 import logging
 import ssl
@@ -37,17 +36,16 @@ async def connect_starbelly(
     ) as ws:
         # create client and run background tasks
         async with trio.open_nursery() as nursery:
-            conn = StarbellyConnection(ws, json_format=json_format)
+            conn = StarbellyConnection(ws)
             nursery.start_soon(conn.background_task)
             yield conn
 
 
 class StarbellyConnection:
-    def __init__(self, ws: trio_websocket.WebSocketConnection, json_format=False):
+    def __init__(self, ws: trio_websocket.WebSocketConnection):
         self.ws = ws
         self.requests = dict()
         self.request_id = itertools.count()
-        self.json_format = json_format
 
     async def delete_captcha_solver(self, solver_id: bytes):
         request = starbelly_pb2.Request(
@@ -264,32 +262,21 @@ class StarbellyConnection:
                 min_interval=min_interval
             ),
         )
-        # TODO: implemement subscription
-        response = await self.send_request(request)
-
-    async def subscribe_job_status(
-        self, min_interval: float = None
-    ) -> starbelly_pb2.ResponseNewSubscription:
-        request = starbelly_pb2.Request(
-            request_id=next(self.request_id),
-            subscribe_job_status=starbelly_pb2.RequestSubscribeJobStatus(
-                min_interval=min_interval
-            ),
-        )
-        # TODO: implemement subscription
-        response = await self.send_request(request)
+        async for event in self.subscribe(request):
+            yield event
 
     async def subscribe_job_sync(
         self, job_id: bytes, sync_token: bytes = None, compression_ok: bool = True
     ) -> starbelly_pb2.ResponseNewSubscription:
+        # TODO: Fixme - this returns no data and the request times out.
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             subscribe_job_sync=starbelly_pb2.RequestSubscribeJobSync(
                 job_id=job_id, sync_token=sync_token, compression_ok=compression_ok
             ),
         )
-        # TODO: implemement subscription
-        response = await self.send_request(request)
+        async for event in self.subscribe(request):
+            yield event
 
     async def subscribe_resource_monitor(
         self, history: int = None
@@ -300,8 +287,8 @@ class StarbellyConnection:
                 history=history
             ),
         )
-        # TODO: implemement subscription
-        response = await self.send_request(request)
+        async for event in self.subscribe(request):
+            yield event
 
     async def subscribe_task_monitor(
         self, period: int = None
@@ -312,8 +299,8 @@ class StarbellyConnection:
                 period=period
             ),
         )
-        # TODO: implemement subscription
-        response = await self.send_request(request)
+        async for event in self.subscribe(request):
+            yield event
 
     async def unsubscribe(self, subscripion_id: int):
         request = starbelly_pb2.Request(
@@ -322,6 +309,20 @@ class StarbellyConnection:
         )
         # TODO: implemement unsubscription
         response = await self.send_request(request)
+
+    async def subscribe(self, request):
+        response = await self.send_request(request)
+        subscription_id = response.new_subscription.subscription_id
+        while True:
+            msg = await self.ws.get_message()
+            server_message = starbelly_pb2.ServerMessage()
+            server_message.ParseFromString(msg)
+            try:
+                event = server_message.event
+                if event.subscription_id == subscription_id:
+                    yield event
+            except AttributeError:
+                pass
 
     async def send_request(self, request):
         when_completed = trio.Event()
@@ -341,10 +342,6 @@ class StarbellyConnection:
                 request_id = server_message.response.request_id
                 when_completed = self.requests[request_id]
                 self.requests[request_id] = server_message.response
-                if self.json_format:
-                    print(MessageToJson(server_message.response))
-                else:
-                    print(server_message.response)
                 when_completed.set()
 
     async def done(self):
