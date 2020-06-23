@@ -235,15 +235,17 @@ class StarbellyConnection:
 
     async def set_job(
         self,
-        run_state: starbelly_pb2.JobRunState,
-        policy_id: bytes,
-        seeds: list,
-        name: str,
+        run_state: starbelly_pb2.JobRunState = None,
+        policy_id: bytes = None,
+        seeds: list = None,
+        name: str = None,
+        job_id: bytes = None,
         tags: list = [],
     ) -> starbelly_pb2.ResponseNewJob:
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             set_job=starbelly_pb2.RequestSetJob(
+                job_id=job_id,
                 run_state=run_state,
                 policy_id=policy_id,
                 seeds=seeds,

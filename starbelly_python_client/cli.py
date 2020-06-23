@@ -15,13 +15,6 @@ from .client import connect_starbelly
 
 
 logger = logging.getLogger("StarbellyCli")
-_JOB_RUN_STATES = {
-    "CANCELLED": starbelly_pb2.JobRunState.CANCELLED,
-    "COMPLETED": starbelly_pb2.JobRunState.COMPLETED,
-    "PAUSED": starbelly_pb2.JobRunState.PAUSED,
-    "PENDING": starbelly_pb2.JobRunState.PENDING,
-    "RUNNING": starbelly_pb2.JobRunState.RUNNING,
-}
 
 
 async def cli(args):
@@ -285,27 +278,26 @@ def _build_set_job_parser(subparsers: argparse.ArgumentParser):
     set_job_parser = subparsers.add_parser("set-job", help="set job")
     set_job_parser.set_defaults(func="set_job")
     set_job_parser.add_argument(
-        "run_state",
-        metavar="run-state",
-        help=f"run state [{','.join(_JOB_RUN_STATES.keys())}]",
-        type=lambda run_state: _JOB_RUN_STATES[run_state],
-        choices=starbelly_pb2.JobRunState.keys(),
+        "--run-state",
+        help=f"run state {starbelly_pb2.JobRunState.items()}",
+        type=int,
+        choices=starbelly_pb2.JobRunState.values(),
     )
     set_job_parser.add_argument(
-        "policy_id",
-        metavar="policy-id",
-        help="policy ID [base64 encoded]",
-        type=b64decode,
+        "--job-id", help="job ID [base64 encoded]", type=b64decode,
     )
     set_job_parser.add_argument(
-        "name", help="job name", type=str,
+        "--policy-id", help="policy ID [base64 encoded]", type=b64decode,
+    )
+    set_job_parser.add_argument(
+        "--name", help="job name", type=str,
     )
     set_job_parser.add_argument(
         "--tags",
         help="job tags ('tag1,tag2,tag3')",
         type=lambda s: [i.strip() for i in s.split(",") if i.strip()],
     )
-    set_job_parser.add_argument("seeds", help="job seed url(s)", nargs="+")
+    set_job_parser.add_argument("--seeds", help="job seed url(s)", nargs="+")
     set_job_parser.set_defaults(func="set_job")
 
 
