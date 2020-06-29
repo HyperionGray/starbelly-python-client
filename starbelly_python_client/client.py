@@ -37,7 +37,7 @@ async def connect_starbelly(
         # create client and run background tasks
         async with trio.open_nursery() as nursery:
             conn = StarbellyConnection(ws)
-            nursery.start_soon(conn.background_task)
+            nursery.start_soon(conn._background_task)
             yield conn
 
 
@@ -334,7 +334,7 @@ class StarbellyConnection:
         await when_completed.wait()
         return self.requests.pop(request.request_id)
 
-    async def background_task(self):
+    async def _background_task(self):
         while True:
             msg = await self.ws.get_message()
             server_message = starbelly_pb2.ServerMessage()
