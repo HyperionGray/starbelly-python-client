@@ -42,12 +42,24 @@ async def connect_starbelly(
 
 
 class StarbellyConnection:
+    """
+    The StarbellyConnection class implements the websocket API gateway to Starbelly.
+    """
+
     def __init__(self, ws: trio_websocket.WebSocketConnection):
         self.ws = ws
         self.requests = dict()
         self.request_id = itertools.count()
 
     async def delete_captcha_solver(self, solver_id: bytes):
+        """Delete captcha solver
+
+        Args:
+            solver_id (bytes): The solver ID
+
+        Returns:
+            [type]: [description]
+        """
         request = starbelly_pb2.Request(
             request_id=next(self.request_id),
             delete_captcha_solver=starbelly_pb2.RequestDeleteCaptchaSolver(
@@ -133,6 +145,7 @@ class StarbellyConnection:
                 include_success=include_success,
                 include_error=include_error,
                 include_exception=include_exception,
+                compression_ok=comression_ok,
                 page=page,
             ),
         )
