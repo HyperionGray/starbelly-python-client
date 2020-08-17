@@ -3,11 +3,11 @@ Starbelly Command Line Client
 """
 import argparse
 from base64 import b64decode
-from google.protobuf.json_format import MessageToJson
 import inspect
 import logging
 import os
 import trio
+from google.protobuf.json_format import MessageToJson
 from trio_websocket import ConnectionClosed, ConnectionRejected
 from starbelly_proto import starbelly_pb2
 
@@ -31,6 +31,7 @@ async def cli(args):
             func = getattr(conn, args.func)
             sig = inspect.signature(func)
             func_args = {k: getattr(args, k) for k in sig.parameters}
+            print(func_args)
             if inspect.isasyncgenfunction(func):
                 async for event in func(**func_args):
                     print(MessageToJson(event))
@@ -38,10 +39,10 @@ async def cli(args):
                 response = await func(**func_args)
                 print(MessageToJson(response))
                 await conn.done()
-    except ConnectionClosed as cc:
+    except ConnectionClosed as cc_error:
         logger.debug("Connection closed")
-    except ConnectionRejected as cc:
-        print(f"{cc.status_code} Connection rejected: {cc.body}")
+    except ConnectionRejected as cc_error:
+        print(f"{cc_error.status_code} Connection rejected: {cc_error.body}")
     except OSError as ose:
         logger.error("Connection attempt failed: %s", ose)
 
@@ -164,26 +165,30 @@ def _build_get_job_items_parser(subparsers: argparse.ArgumentParser):
     get_job_items_parser.add_argument(
         "--include-success",
         help="include successful crawl items",
-        type=int,
+        type=lambda x: bool(int(x)),
         choices=[0, 1],
         default=1,
     )
     get_job_items_parser.add_argument(
         "--include-error",
         help="include error crawl items",
-        type=int,
+        type=lambda x: bool(int(x)),
         choices=[0, 1],
         default=1,
     )
     get_job_items_parser.add_argument(
         "--include-exception",
         help="include crawl items that raised exceptions",
-        type=int,
+        type=lambda x: bool(int(x)),
         choices=[0, 1],
         default=1,
     )
     get_job_items_parser.add_argument(
-        "--compression_ok", help="compress data", type=bool, choices=[0, 1], default=1,
+        "--compression-ok",
+        help="compress data",
+        type=lambda x: bool(int(x)),
+        choices=[0, 1],
+        default=1
     )
     get_job_items_parser.add_argument("--offset", help="results offset", type=int)
     get_job_items_parser.add_argument("--limit", help="results to return", type=int)
@@ -409,5 +414,8 @@ def _parse_cmd_args():
 
 
 def main():
+    """
+    Main entrypoint for command line cli.
+    """
     args = _parse_cmd_args()
     trio.run(cli, args)

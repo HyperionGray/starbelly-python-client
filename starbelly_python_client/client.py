@@ -145,7 +145,7 @@ class StarbellyConnection:
                 include_success=include_success,
                 include_error=include_error,
                 include_exception=include_exception,
-                compression_ok=comression_ok,
+                compression_ok=compression_ok,
                 page=page,
             ),
         )
