@@ -1,0 +1,8 @@
+./starbelly_proto/starbelly_pb2.py
+./starbelly_proto/__init__.py
+./tests/__init__.py
+./tests/test_starbelly_python_client.py
+./docs/conf.py
+./starbelly_python_client/__init__.py
+./starbelly_python_client/client.py
+./starbelly_python_client/cli.py
